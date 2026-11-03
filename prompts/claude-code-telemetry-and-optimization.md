@@ -315,7 +315,7 @@ Update `$HOME/.claude/settings.json` (preserving existing keys) so it includes:
 - `"hooks"` for `UserPromptSubmit` (`$HOME/.claude/prompt-score-hook.sh`), `PostToolUse` with matcher `Edit|Write` (`$HOME/.claude/post-edit-format.sh`), `Notification` (`notify-send`), and `Stop` (`notify-send`).
 - Also check `$HOME/.claude.json` and remove any duplicate global `mcpServers.playwright` entry (backing up `.claude.json` first).
 
-### Step 7: Append Token, Context & Tool Efficiency Rules to `~/.claude/CLAUDE.md`
+### Step 7: Append Token, Context & Tool Efficiency + Reusable Prompt Capture Rules to `~/.claude/CLAUDE.md`
 Ensure `$HOME/.claude/CLAUDE.md` contains:
 ```markdown
 ## Token, Context & Tool Efficiency
@@ -323,6 +323,12 @@ Ensure `$HOME/.claude/CLAUDE.md` contains:
 - **Batch Parallel Tool Calls**: Combine independent read, search, and verification tool calls into a single turn rather than sequential back-and-forth turns.
 - **Concise Responses**: Do not repeat modified code blocks or write lengthy post-task summaries unless asked. State what changed, where (`file:line`), and how it was verified.
 - **Quiet Command Output**: When running build, test, or package commands via `Bash`, prefer concise/quiet flags or tail/filter output so multi-thousand-line logs do not pollute the context window.
+
+## Capture Generic, High-Value Prompts in `~/Projects/useful-prompts`
+- Whenever you notice that a prompt, workflow, or multi-step setup crafted during a session is generic and highly reusable across other projects, products, or developer environments:
+  1. Generalize it (strip any project-specific secrets, credentials, internal domains, or proprietary business logic, as `~/Projects/useful-prompts` is a public repository).
+  2. Add it as a clean Markdown file under `$HOME/Projects/useful-prompts/prompts/<descriptive-kebab-name>.md`.
+  3. Register it in the Prompt Catalog table in `$HOME/Projects/useful-prompts/README.md`.
 ```
 
 Finally, test `$HOME/.claude/prompt-score-hook.sh` and `$HOME/.claude/statusline.sh` with a sample JSON payload and show me the output.
