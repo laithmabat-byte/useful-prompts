@@ -230,3 +230,41 @@ the stack changes the error response. Report the raw diff, and give a second
 diff with line numbers masked so the reader sees that is the only change.
 Proposal patches go stale when a later commit edits the same lines; run
 `git apply --check` on every patch before citing it.
+
+**Cache-server commands by origin.** Query recorders usually capture SQL
+only. To group cache commands the same way, replay the unit's request
+sequence in one process against the web application object (a WSGI or ASGI
+test client, after a few unrecorded warm passes), wrap the cache client's
+lowest send methods (single commands and pipelines), and keep each command's
+call stack and round-trip time. The origin is the innermost frame outside
+the cache plumbing. Check the recorded total against the cache server's own
+per-command counters over the same window, and once against its command
+monitor while a real worker serves the sequence. All three must agree before
+the breakdown is trusted.
+
+**List-page findings worth checking first:**
+- Field-level policy caches (masking, field permissions) read once per child
+  type of the schema bundle and once per list query, each returning an empty
+  list for types that have no such field. Ask the schema first.
+- The same per-user record read once per request by several code paths,
+  through a request-local cache. Moving one or two readers to a process-wide
+  cache only moves the fetch to the next reader. Count every reader before
+  proposing, then measure.
+- A permission check that formats a localized denial message, which loads
+  the translation table, for a check that a fallback (read implies select)
+  then grants.
+- A query helper that reads the user's saved settings on every query to
+  write them back unchanged. Check whether it ever saves anything.
+- A per-open lookup of a settings record that does not exist for most types.
+- An access gate that queries every type of the switched-off modules when the
+  check on the next line, on cached schema, already covers them.
+- CPU-only overhead that no SQL or cache count shows: for example a
+  feature-flag reader that resolves file paths on every call. Profile one
+  in-process run per unit. Under one interpreter lock, 0.3 ms of CPU per
+  request showed up as a 27 percent lower p95 at five users.
+
+**Users for a list-page response diff.** Use the widest role, the narrowest
+role that can open the list, and a user limited by a row-level permission
+to one master record, so every row goes through that condition. Fix the
+client timestamp that the UI writes into saved list settings, or every run
+differs.
