@@ -172,6 +172,22 @@ refused (switched-off features, another module's records), so a change to
 an access gate shows up as a diff. Store the captures gzipped without a
 header timestamp, so equal content gives equal files.
 
+**Boot or session payload pages (the app shell's bootstrap JSON).** Measure
+two paths, not one: the reload, which usually reads the bootstrap from a
+per-user cache, and the login, which empties that cache and builds it from the
+database (often ten times the statements, and the path every cache clear
+sends every user down). Add the login as an opt-in harness action so the
+standard page set keeps its numbers. For the proof, parse the bootstrap out
+of the HTML and diff it key by key, as several single-role users plus the
+admin. Lists the server builds from a hash set come back in a different order
+in every worker process (string hash randomisation), so two captures from
+one process agree and a capture after a restart does not: capture the
+baseline twice across a restart, sort only the lists the code builds from
+sets, and mask only random cache-busting ids and timestamps. Also scan the
+bootstrap for every name a feature switch turns off and keep the hits in the
+capture: a change to the gate then shows as a diff, and existing leaks show
+up on the first run.
+
 **Per-request overhead often beats per-page work on small read pages.** A
 form open that fires eight API calls pays eight times for every gate, flag
 or metadata lookup, plus an end-of-request commit or rollback that does
