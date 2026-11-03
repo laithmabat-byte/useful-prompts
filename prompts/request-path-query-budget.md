@@ -53,8 +53,8 @@ RULES
 2. Do not touch config, process counts or imports. Other tasks own those.
    Only your request path.
 3. Every change: run the request measurement for your unit before and
-   after, and the full measurement set once at the end. Revert if the count
-   is not lower or any test fails. Run the product's tests and the upstream
+   after, and the full measurement set once at the end. Revert if neither
+   the statement count nor the wall time improves, or if any test fails. Run the product's tests and the upstream
    tests of anything you override or edit. Show that each new test fails
    without the change.
 4. One change per commit. Message states before, after, business impact
@@ -187,3 +187,46 @@ that the measured stack never serves (move it out of the served directory
 while measuring) and drop it at the end. If product-level feature switches
 break the upstream test bootstrap, give the scratch site its own switch
 file rather than editing the shared one.
+
+**Report pages: measure under concurrency, and read the tail with enough
+samples.** For a heavy read page (a ledger report), add to CONTEXT: "measure
+with N concurrent users as well as one, and report the slowest 5 percent".
+Use N distinct users with the same roles (frameworks often cap sessions per
+user, and a new login silently ends an old one), one unmeasured round per
+session first, then N x R closed-loop rounds. With one web process and a
+global interpreter lock, the p95 at N users is roughly N times the request's
+CPU time, so CPU saved per request matters more than statements saved. The
+95th percentile of 100 samples is the 5th slowest and can move by 40 % between
+two runs of the same code; settle it with the interleaved A/B and 200 or more
+samples per side.
+
+**Report-specific findings worth checking first:**
+- `(date >= from OR is_opening) AND (date <= to OR is_opening)` style
+  conditions defeat every index, so each run full-scans the ledger's whole
+  history. An index on the flag alone does not change the plan; splitting
+  into two disjoint UNION ALL branches does. It is a schema change on an
+  insert-heavy table, so measure the write path too.
+- A translation or formatting call per row on a handful of distinct values
+  (thousands of calls per run). A run-local memo is exact.
+- Master tables read in full to name the parties in the result. Skipping
+  party types absent from the result is safe; filtering by an IN list of
+  names was slower than the full read once the list was large. Measure
+  before choosing.
+- The report document loaded twice in one request (once to run, once to
+  check filter permissions), and its role check run twice by the form load.
+
+**Wall-only changes and the revert rule.** Write rule 3 as "revert only when
+neither the statement count nor the wall time improves": a count-only rule
+throws away the CPU savings that matter most under concurrency. When a change
+also touches schema (an index on an insert-heavy table), ask before applying,
+and state its business, performance, schema and risk impact in the question.
+An index the product needs without editing the upstream table definition can
+be created from the product package in an idempotent post-migrate hook; check
+whether the framework's schema sync drops indexes it does not know about.
+
+**Error responses carry tracebacks.** If the framework returns a traceback
+with source line numbers to the user, any edit that moves lines in a file on
+the stack changes the error response. Report the raw diff, and give a second
+diff with line numbers masked so the reader sees that is the only change.
+Proposal patches go stale when a later commit edits the same lines; run
+`git apply --check` on every patch before citing it.
