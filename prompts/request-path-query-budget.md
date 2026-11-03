@@ -63,6 +63,20 @@ RULES
 5. Report failures as failures. No test-cleanup endpoints or debug routes in
    application code. Correctness beats speed: a change that alters business
    output (ledger rows, totals, stock levels) is a failure however fast.
+6. Anything that is a risk or a deferred fix goes as a dated one-liner in
+   <roadmap file> under the right section. Not in chat only.
+7. Proof of no business change, required before any commit:
+   - Capture the full HTTP response of your unit before and after on 20
+     different records, as two users: an administrator and a restricted
+     user with a single narrow role. Diff them with timestamps and request
+     ids removed. Any difference is a failure.
+   - Never remove or skip a permission check. If a permission query
+     repeats, cache it inside the same request only, never across users or
+     requests.
+   - If your change touches a save or submit path, verify that the same
+     document events, notifications, webhooks and server-side scripts fire
+     before and after, by counting them in a test.
+   - Put the diff command and its empty output in the deliverable.
 
 TASK
 1. Read the saved query log for your unit. Group statements by origin (the
@@ -145,6 +159,28 @@ move by tens of percent. Alternate before/after rounds with enough
 iterations, drop the first (cold) iteration, and report median and
 interquartile range. A page that runs none of the changed code and sends the
 same statements is not slower because its median moved inside the IQR.
+
+**Response diff harness (rule 7).** Script the unit's exact request sequence
+as the UI sends it, for a fixed set of records chosen deterministically (for
+example by a hash of the name) and covering drafts, records with comments,
+and each kind of transaction. Keep status, headers and body whole. Drop only
+headers that change on every response (date, cookies, content length) and
+the framework's per-error random id. Send one unrecorded warm-up pass first,
+so first-view side effects do not differ between runs. Run it twice on the
+same code before trusting it. Add a few probe requests that must stay
+refused (switched-off features, another module's records), so a change to
+an access gate shows up as a diff. Store the captures gzipped without a
+header timestamp, so equal content gives equal files.
+
+**Per-request overhead often beats per-page work on small read pages.** A
+form open that fires eight API calls pays eight times for every gate, flag
+or metadata lookup, plus an end-of-request commit or rollback that does
+nothing in a read-only transaction. Cache schema-like lookups (which module
+a type belongs to) under keys the framework already invalidates. Keep
+permission and per-user answers per request. The first statement of each
+connection absorbs the lazy connect in recorder timings, so removing it
+moves that cost to the next statement. Read wall time from the timing pass,
+not the recorder.
 
 **Tests on a throwaway site.** Run upstream suites on a scratch tenant/site
 that the measured stack never serves (move it out of the served directory
